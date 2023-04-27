@@ -55,3 +55,111 @@ class ActivatorManager(models.Manager):
         return self.get_queryset().active(at)
 
     def inactive(self, at=None):
+        return self.get_queryset().inactive(at)
+
+
+class ActivatorModel(models.Model):
+    """
+    An abstract base model that provides activation/deactivation
+    functionality with date ranges.
+    """
+    is_enabled = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Master switch to enable/disable this item."
+    )
+    activate_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Date/time when this item becomes active."
+    )
+    deactivate_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Date/time when this item becomes inactive."
+    )
+
+    objects = ActivatorManager()
+
+    class Meta:
+        abstract = True
+
+    @property
+    def is_active(self):
+        """Check if the object is currently active."""
+        if not self.is_enabled:
+            return False
+
+        now = timezone.now()
+
+        if self.activate_date and now < self.activate_date:
+            return False
+
+        if self.deactivate_date and now >= self.deactivate_date:
+            return False
+
+        return True
+
+    def activate(self, save=True):
+        """Enable and clear date restrictions."""
+        self.is_enabled = True
+        self.activate_date = None
+        self.deactivate_date = None
+        if save:
+            self.save(update_fields=['is_enabled', 'activate_date', 'deactivate_date'])
+
+    def deactivate(self, save=True):
+        """Disable the object."""
+        self.is_enabled = False
+        if save:
+            self.save(update_fields=['is_enabled'])
+
+    def schedule_activation(self, start, end=None, save=True):
+        """Schedule activation between start and end dates."""
+        self.is_enabled = True
+        self.activate_date = start
+        self.deactivate_date = end
+        if save:
+            self.save(update_fields=['is_enabled', 'activate_date', 'deactivate_date'])
+
+    @property
+    def activation_status(self):
+        """Return a string describing the activation status."""
+        if not self.is_enabled:
+            return 'disabled'
+
+        now = timezone.now()
+
+        if self.activate_date and now < self.activate_date:
+            return 'scheduled'
+
+        if self.deactivate_date and now >= self.deactivate_date:
+            return 'expired'
+
+        return 'active'
+
+    @property
+    def time_until_active(self):
+        """Return time until activation, or None if already active or disabled."""
+        if not self.is_enabled:
+            return None
+
+        now = timezone.now()
+
+        if self.activate_date and now < self.activate_date:
+            return self.activate_date - now
+
+        return None
+
+    @property
+    def time_until_inactive(self):
+        """Return time until deactivation, or None if no deactivation scheduled."""
+        if not self.is_active:
+            return None
+
+        if self.deactivate_date:
+            return self.deactivate_date - timezone.now()
+
+        return None
