@@ -64,3 +64,103 @@ class TestSoftDeleteModel:
         obj.refresh_from_db()
 
         assert obj.deleted_at is not None
+        assert obj.is_deleted is True
+        assert obj.is_alive is False
+
+    def test_soft_delete_excludes_from_default_manager(self, create_tables):
+        """Test that soft-deleted objects are excluded from default queryset."""
+        obj = ConcreteSoftDeleteModel.objects.create(name='test')
+        obj.delete()
+
+        assert ConcreteSoftDeleteModel.objects.filter(pk=obj.pk).count() == 0
+
+    def test_soft_deleted_visible_in_all_objects(self, create_tables):
+        """Test that soft-deleted objects are visible in all_objects."""
+        obj = ConcreteSoftDeleteModel.objects.create(name='test')
+        obj.delete()
+
+        assert ConcreteSoftDeleteModel.all_objects.filter(pk=obj.pk).count() == 1
+
+    def test_soft_deleted_visible_in_deleted_manager(self, create_tables):
+        """Test that soft-deleted objects are visible in deleted manager."""
+        obj = ConcreteSoftDeleteModel.objects.create(name='test')
+        obj.delete()
+
+        assert ConcreteSoftDeleteModel.deleted.filter(pk=obj.pk).count() == 1
+
+    def test_restore(self, create_tables):
+        """Test restoring a soft-deleted object."""
+        obj = ConcreteSoftDeleteModel.objects.create(name='test')
+        obj.delete()
+        assert obj.is_deleted is True
+
+        obj.restore()
+        obj.refresh_from_db()
+
+        assert obj.deleted_at is None
+        assert obj.is_deleted is False
+        assert obj.is_alive is True
+
+    def test_hard_delete(self, create_tables):
+        """Test hard delete permanently removes object."""
+        obj = ConcreteSoftDeleteModel.objects.create(name='test')
+        pk = obj.pk
+
+        obj.hard_delete()
+
+        assert ConcreteSoftDeleteModel.all_objects.filter(pk=pk).count() == 0
+
+    def test_delete_with_hard_flag(self, create_tables):
+        """Test delete with hard=True permanently removes object."""
+        obj = ConcreteSoftDeleteModel.objects.create(name='test')
+        pk = obj.pk
+
+        obj.delete(hard=True)
+
+        assert ConcreteSoftDeleteModel.all_objects.filter(pk=pk).count() == 0
+
+    def test_queryset_delete(self, create_tables):
+        """Test queryset delete soft-deletes all objects."""
+        ConcreteSoftDeleteModel.objects.create(name='test1')
+        ConcreteSoftDeleteModel.objects.create(name='test2')
+
+        ConcreteSoftDeleteModel.objects.all().delete()
+
+        assert ConcreteSoftDeleteModel.objects.count() == 0
+        assert ConcreteSoftDeleteModel.all_objects.count() == 2
+
+    def test_queryset_hard_delete(self, create_tables):
+        """Test queryset hard_delete permanently removes all objects."""
+        ConcreteSoftDeleteModel.objects.create(name='test1')
+        ConcreteSoftDeleteModel.objects.create(name='test2')
+
+        ConcreteSoftDeleteModel.all_objects.all().hard_delete()
+
+        assert ConcreteSoftDeleteModel.all_objects.count() == 0
+
+    def test_queryset_restore(self, create_tables):
+        """Test queryset restore restores all soft-deleted objects."""
+        obj1 = ConcreteSoftDeleteModel.objects.create(name='test1')
+        obj2 = ConcreteSoftDeleteModel.objects.create(name='test2')
+        obj1.delete()
+        obj2.delete()
+
+        ConcreteSoftDeleteModel.all_objects.all().restore()
+
+        assert ConcreteSoftDeleteModel.objects.count() == 2
+
+    def test_is_deleted_property(self, create_tables):
+        """Test is_deleted property."""
+        obj = ConcreteSoftDeleteModel.objects.create(name='test')
+        assert obj.is_deleted is False
+
+        obj.delete()
+        assert obj.is_deleted is True
+
+    def test_is_alive_property(self, create_tables):
+        """Test is_alive property."""
+        obj = ConcreteSoftDeleteModel.objects.create(name='test')
+        assert obj.is_alive is True
+
+        obj.delete()
+        assert obj.is_alive is False
