@@ -78,3 +78,125 @@ class TestNormalizeColor:
         assert normalize_color('rgb(255, 128, 0)') == '#ff8000'
 
     def test_invalid(self):
+        """Test invalid color returns None."""
+        assert normalize_color('invalid') is None
+        assert normalize_color('') is None
+
+
+class TestColorValidator:
+    """Test cases for ColorValidator."""
+
+    def test_valid_hex3(self):
+        """Test valid 3-digit hex."""
+        validator = ColorValidator()
+        validator('#FFF')
+
+    def test_valid_hex6(self):
+        """Test valid 6-digit hex."""
+        validator = ColorValidator()
+        validator('#FFFFFF')
+
+    def test_valid_rgb(self):
+        """Test valid rgb."""
+        validator = ColorValidator()
+        validator('rgb(255, 255, 255)')
+
+    def test_valid_rgba(self):
+        """Test valid rgba."""
+        validator = ColorValidator()
+        validator('rgba(255, 255, 255, 0.5)')
+
+    def test_valid_hsl(self):
+        """Test valid hsl."""
+        validator = ColorValidator()
+        validator('hsl(360, 100%, 50%)')
+
+    def test_valid_hsla(self):
+        """Test valid hsla."""
+        validator = ColorValidator()
+        validator('hsla(360, 100%, 50%, 0.5)')
+
+    def test_valid_named(self):
+        """Test valid named color."""
+        validator = ColorValidator()
+        validator('red')
+        validator('blue')
+
+    def test_invalid_format(self):
+        """Test invalid format."""
+        validator = ColorValidator()
+        with pytest.raises(ValidationError):
+            validator('invalid')
+
+    def test_invalid_hex(self):
+        """Test invalid hex."""
+        validator = ColorValidator()
+        with pytest.raises(ValidationError):
+            validator('#GGG')
+
+    def test_rgb_out_of_range(self):
+        """Test rgb values out of range."""
+        validator = ColorValidator()
+        with pytest.raises(ValidationError):
+            validator('rgb(256, 0, 0)')
+
+    def test_hsl_hue_out_of_range(self):
+        """Test hsl hue out of range."""
+        validator = ColorValidator()
+        with pytest.raises(ValidationError):
+            validator('hsl(400, 50%, 50%)')
+
+    def test_empty_allowed(self):
+        """Test empty value is allowed."""
+        validator = ColorValidator()
+        validator('')
+        validator(None)
+
+    def test_disallow_named(self):
+        """Test disallowing named colors."""
+        validator = ColorValidator(allow_named=False)
+        with pytest.raises(ValidationError):
+            validator('red')
+
+    def test_restrict_formats(self):
+        """Test restricting formats."""
+        validator = ColorValidator(formats=['hex6'])
+        validator('#FFFFFF')  # OK
+
+        with pytest.raises(ValidationError):
+            validator('#FFF')  # hex3 not allowed
+
+    def test_equality(self):
+        """Test validator equality."""
+        v1 = ColorValidator(formats=['hex6'])
+        v2 = ColorValidator(formats=['hex6'])
+        v3 = ColorValidator(formats=['rgb'])
+
+        assert v1 == v2
+        assert v1 != v3
+
+
+class TestValidateColor:
+    """Test cases for validate_color function."""
+
+    def test_valid(self):
+        """Test valid color."""
+        validate_color('#FFFFFF')
+
+    def test_invalid(self):
+        """Test invalid color."""
+        with pytest.raises(ValidationError):
+            validate_color('invalid')
+
+
+class TestIsValidColor:
+    """Test cases for is_valid_color function."""
+
+    def test_valid(self):
+        """Test valid color returns True."""
+        assert is_valid_color('#FFFFFF') is True
+        assert is_valid_color('rgb(255, 0, 0)') is True
+
+    def test_invalid(self):
+        """Test invalid color returns False."""
+        assert is_valid_color('invalid') is False
