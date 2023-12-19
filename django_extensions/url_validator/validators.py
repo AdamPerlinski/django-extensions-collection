@@ -57,3 +57,114 @@ class URLValidator(DjangoURLValidator):
             schemes = ['http', 'https']
 
         super().__init__(schemes=schemes, message=message or self.message)
+
+        if code:
+            self.code = code
+
+    def __call__(self, value):
+        if not value:
+            return
+
+        # Run parent validation
+        super().__call__(value)
+
+        # Parse URL
+        parsed = urlparse(value)
+        domain = parsed.netloc.lower()
+
+        # Remove port if present
+        if ':' in domain:
+            domain = domain.split(':')[0]
+
+        # Check TLD requirement
+        if self.require_tld and '.' not in domain:
+            raise ValidationError(
+                "URL must contain a valid domain with TLD.",
+                code='no_tld'
+            )
+
+        # Check allowed domains
+        if self.allowed_domains:
+            if not self._domain_matches(domain, self.allowed_domains):
+                raise ValidationError(
+                    f"Domain not allowed. Allowed domains: {', '.join(self.allowed_domains)}",
+                    code='domain_not_allowed'
+                )
+
+        # Check blocked domains
+        if self.blocked_domains:
+            if self._domain_matches(domain, self.blocked_domains):
+                raise ValidationError(
+                    "This domain is not allowed.",
+                    code='domain_blocked'
+                )
+
+    def _domain_matches(self, domain, domain_list):
+        """Check if domain matches any in the list (including subdomains)."""
+        for allowed in domain_list:
+            allowed = allowed.lower()
+            if domain == allowed or domain.endswith('.' + allowed):
+                return True
+        return False
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, URLValidator) and
+            self.schemes == other.schemes and
+            self.allowed_domains == other.allowed_domains and
+            self.blocked_domains == other.blocked_domains and
+            self.require_tld == other.require_tld
+        )
+
+
+def validate_url(value, **kwargs):
+    """
+    Validate a URL value.
+
+    Args:
+        value: The URL to validate.
+        **kwargs: Additional arguments passed to URLValidator.
+
+    Raises:
+        ValidationError: If the URL is invalid.
+    """
+    validator = URLValidator(**kwargs)
+    validator(value)
+
+
+def is_valid_url(value, **kwargs):
+    """
+    Check if a URL is valid.
+
+    Args:
+        value: The URL to check.
+        **kwargs: Additional arguments passed to URLValidator.
+
+    Returns:
+        bool: True if valid, False otherwise.
+    """
+    try:
+        validate_url(value, **kwargs)
+        return True
+    except ValidationError:
+        return False
+
+
+def extract_domain(url):
+    """
+    Extract the domain from a URL.
+
+    Args:
+        url: The URL to extract domain from.
+
+    Returns:
+        The domain string, or None if invalid.
+    """
+    try:
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower()
+        if ':' in domain:
+            domain = domain.split(':')[0]
+        return domain or None
+    except Exception:
+        return None
