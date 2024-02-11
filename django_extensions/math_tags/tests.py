@@ -98,3 +98,154 @@ class TestPower:
         """Test basic power."""
         assert power(2, 3) == 8
 
+    def test_square(self):
+        """Test squaring."""
+        assert power(5, 2) == 25
+
+
+class TestPercentage:
+    """Test cases for percentage filter."""
+
+    def test_basic(self):
+        """Test basic percentage."""
+        assert percentage(25, 100) == 25.0
+
+    def test_half(self):
+        """Test 50%."""
+        assert percentage(50, 100) == 50.0
+
+    def test_division_by_zero(self):
+        """Test division by zero returns 0."""
+        assert percentage(10, 0) == 0
+
+
+class TestAbsValue:
+    """Test cases for abs_value filter."""
+
+    def test_positive(self):
+        """Test positive number unchanged."""
+        assert abs_value(5) == 5
+
+    def test_negative(self):
+        """Test negative becomes positive."""
+        assert abs_value(-5) == 5
+
+
+class TestRoundNum:
+    """Test cases for round_num filter."""
+
+    def test_no_decimals(self):
+        """Test rounding to integer."""
+        assert round_num(3.7) == 4
+        assert round_num(3.2) == 3
+
+    def test_with_decimals(self):
+        """Test rounding with decimals."""
+        assert round_num(3.14159, 2) == 3.14
+
+
+class TestFloor:
+    """Test cases for floor filter."""
+
+    def test_basic(self):
+        """Test floor."""
+        assert floor(3.7) == 3
+        assert floor(3.2) == 3
+
+    def test_negative(self):
+        """Test negative floor."""
+        assert floor(-3.2) == -4
+
+
+class TestCeil:
+    """Test cases for ceil filter."""
+
+    def test_basic(self):
+        """Test ceil."""
+        assert ceil(3.2) == 4
+        assert ceil(3.7) == 4
+
+    def test_negative(self):
+        """Test negative ceil."""
+        assert ceil(-3.7) == -3
+
+
+class TestMinValue:
+    """Test cases for min_value filter."""
+
+    def test_first_smaller(self):
+        """Test when first value is smaller."""
+        assert min_value(5, 10) == 5
+
+    def test_second_smaller(self):
+        """Test when second value is smaller."""
+        assert min_value(10, 5) == 5
+
+
+class TestMaxValue:
+    """Test cases for max_value filter."""
+
+    def test_first_larger(self):
+        """Test when first value is larger."""
+        assert max_value(10, 5) == 10
+
+    def test_second_larger(self):
+        """Test when second value is larger."""
+        assert max_value(5, 10) == 10
+
+
+class TestClamp:
+    """Test cases for clamp filter."""
+
+    def test_within_bounds(self):
+        """Test value within bounds."""
+        assert clamp(5, "0,10") == 5
+
+    def test_below_min(self):
+        """Test value below minimum."""
+        assert clamp(-5, "0,10") == 0
+
+    def test_above_max(self):
+        """Test value above maximum."""
+        assert clamp(15, "0,10") == 10
+
+
+class TestSqrt:
+    """Test cases for sqrt filter."""
+
+    def test_perfect_square(self):
+        """Test perfect square."""
+        assert sqrt(16) == 4.0
+        assert sqrt(25) == 5.0
+
+    def test_non_perfect(self):
+        """Test non-perfect square."""
+        assert sqrt(2) == pytest.approx(1.414, rel=0.01)
+
+
+class TestCalculate:
+    """Test cases for calculate tag."""
+
+    def test_addition(self):
+        """Test addition expression."""
+        assert calculate("2 + 3") == 5
+
+    def test_multiplication(self):
+        """Test multiplication expression."""
+        assert calculate("4 * 5") == 20
+
+    def test_order_of_operations(self):
+        """Test order of operations."""
+        assert calculate("2 + 3 * 4") == 14
+
+    def test_parentheses(self):
+        """Test parentheses."""
+        assert calculate("(2 + 3) * 4") == 20
+
+    def test_invalid_chars(self):
+        """Test invalid characters rejected."""
+        assert calculate("import os") == 'Invalid expression'
+
+    def test_division(self):
+        """Test division."""
+        assert calculate("10 / 2") == 5.0
