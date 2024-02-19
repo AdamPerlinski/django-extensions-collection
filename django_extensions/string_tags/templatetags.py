@@ -108,3 +108,208 @@ def replace(value, args):
 def split(value, separator=' '):
     """
     Split string into list.
+
+    Usage: {{ text|split:"," }}
+    """
+    try:
+        return str(value).split(separator)
+    except (ValueError, TypeError):
+        return [value]
+
+
+@register.filter
+def join_str(value, separator=', '):
+    """
+    Join list into string.
+
+    Usage: {{ items|join_str:", " }}
+    """
+    try:
+        return separator.join(str(v) for v in value)
+    except (ValueError, TypeError):
+        return value
+
+
+@register.filter
+def upper(value):
+    """
+    Convert to uppercase.
+
+    Usage: {{ text|upper }}
+    """
+    try:
+        return str(value).upper()
+    except (ValueError, TypeError):
+        return value
+
+
+@register.filter
+def lower(value):
+    """
+    Convert to lowercase.
+
+    Usage: {{ text|lower }}
+    """
+    try:
+        return str(value).lower()
+    except (ValueError, TypeError):
+        return value
+
+
+@register.filter
+def title(value):
+    """
+    Convert to title case.
+
+    Usage: {{ text|title }}
+    """
+    try:
+        return str(value).title()
+    except (ValueError, TypeError):
+        return value
+
+
+@register.filter
+def capitalize(value):
+    """
+    Capitalize first letter.
+
+    Usage: {{ text|capitalize }}
+    """
+    try:
+        return str(value).capitalize()
+    except (ValueError, TypeError):
+        return value
+
+
+@register.filter
+def slugify(value):
+    """
+    Convert to URL-friendly slug.
+
+    Usage: {{ text|slugify }}
+    """
+    try:
+        return django_slugify(str(value))
+    except (ValueError, TypeError):
+        return value
+
+
+@register.filter
+def startswith(value, prefix):
+    """
+    Check if string starts with prefix.
+
+    Usage: {% if text|startswith:"Hello" %}
+    """
+    try:
+        return str(value).startswith(prefix)
+    except (ValueError, TypeError):
+        return False
+
+
+@register.filter
+def endswith(value, suffix):
+    """
+    Check if string ends with suffix.
+
+    Usage: {% if text|endswith:".pdf" %}
+    """
+    try:
+        return str(value).endswith(suffix)
+    except (ValueError, TypeError):
+        return False
+
+
+@register.filter
+def contains(value, substring):
+    """
+    Check if string contains substring.
+
+    Usage: {% if text|contains:"search" %}
+    """
+    try:
+        return substring in str(value)
+    except (ValueError, TypeError):
+        return False
+
+
+@register.filter
+def reverse_str(value):
+    """
+    Reverse the string.
+
+    Usage: {{ text|reverse_str }}
+    """
+    try:
+        return str(value)[::-1]
+    except (ValueError, TypeError):
+        return value
+
+
+@register.filter
+def repeat(value, times):
+    """
+    Repeat string n times.
+
+    Usage: {{ text|repeat:3 }}
+    """
+    try:
+        return str(value) * int(times)
+    except (ValueError, TypeError):
+        return value
+
+
+@register.filter
+def remove_html(value):
+    """
+    Remove all HTML tags.
+
+    Usage: {{ html_content|remove_html }}
+    """
+    try:
+        return strip_tags(str(value))
+    except (ValueError, TypeError):
+        return value
+
+
+@register.filter
+def regex_replace(value, pattern_repl):
+    """
+    Replace using regex pattern.
+
+    Usage: {{ text|regex_replace:"\\d+,NUMBER" }}
+    """
+    try:
+        pattern, replacement = pattern_repl.split(',', 1)
+        return re.sub(pattern, replacement, str(value))
+    except (ValueError, TypeError, re.error):
+        return value
+
+
+@register.filter
+def pad_left(value, args):
+    """
+    Pad string on the left.
+
+    Usage: {{ num|pad_left:"5,0" }} -> "00042"
+    """
+    try:
+        width, char = args.split(',')
+        return str(value).rjust(int(width), char)
+    except (ValueError, TypeError, AttributeError):
+        return value
+
+
+@register.filter
+def pad_right(value, args):
+    """
+    Pad string on the right.
+
+    Usage: {{ text|pad_right:"10,." }}
+    """
+    try:
+        width, char = args.split(',')
+        return str(value).ljust(int(width), char)
+    except (ValueError, TypeError, AttributeError):
+        return value
