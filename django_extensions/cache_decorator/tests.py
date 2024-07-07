@@ -103,3 +103,161 @@ class TestCacheResult:
             call_count += 1
             return None
 
+        result1 = returns_none()
+        result2 = returns_none()
+
+        assert result1 is None
+        assert result2 is None
+        assert call_count == 1
+
+    def test_cache_none_false(self):
+        """Test not caching None results when disabled."""
+        call_count = 0
+
+        @cache_result(timeout=60, cache_none=False)
+        def returns_none():
+            nonlocal call_count
+            call_count += 1
+            return None
+
+        result1 = returns_none()
+        result2 = returns_none()
+
+        assert result1 is None
+        assert result2 is None
+        assert call_count == 2
+
+
+class TestCachePagePerUser:
+    """Test cases for cache_page_per_user decorator."""
+
+    @pytest.fixture
+    def request_factory(self):
+        return RequestFactory()
+
+    def test_caches_for_authenticated_user(self, request_factory):
+        """Test caching for authenticated users."""
+        call_count = 0
+
+        @cache_page_per_user(timeout=60)
+        def view(request):
+            nonlocal call_count
+            call_count += 1
+            return HttpResponse('OK')
+
+        user = MagicMock()
+        user.is_authenticated = True
+        user.pk = 1
+
+        request1 = request_factory.get('/test/')
+        request1.user = user
+        request2 = request_factory.get('/test/')
+        request2.user = user
+
+        response1 = view(request1)
+        response2 = view(request2)
+
+        assert response1.status_code == 200
+        assert response2.status_code == 200
+        assert call_count == 1
+
+    def test_different_users_separate_cache(self, request_factory):
+        """Test different users have separate caches."""
+        call_count = 0
+
+        @cache_page_per_user(timeout=60)
+        def view(request):
+            nonlocal call_count
+            call_count += 1
+            return HttpResponse('OK')
+
+        user1 = MagicMock()
+        user1.is_authenticated = True
+        user1.pk = 1
+
+        user2 = MagicMock()
+        user2.is_authenticated = True
+        user2.pk = 2
+
+        request1 = request_factory.get('/test/')
+        request1.user = user1
+        request2 = request_factory.get('/test/')
+        request2.user = user2
+
+        view(request1)
+        view(request2)
+
+        assert call_count == 2
+
+    def test_post_not_cached(self, request_factory):
+        """Test POST requests are not cached."""
+        call_count = 0
+
+        @cache_page_per_user(timeout=60)
+        def view(request):
+            nonlocal call_count
+            call_count += 1
+            return HttpResponse('OK')
+
+        user = MagicMock()
+        user.is_authenticated = True
+        user.pk = 1
+
+        request1 = request_factory.post('/test/')
+        request1.user = user
+        request2 = request_factory.post('/test/')
+        request2.user = user
+
+        view(request1)
+        view(request2)
+
+        assert call_count == 2
+
+
+class TestCacheMethod:
+    """Test cases for cache_method decorator."""
+
+    def test_caches_method(self):
+        """Test method result is cached."""
+        call_count = 0
+
+        class MyClass:
+            pk = 1
+
+            @cache_method(timeout=60)
+            def expensive_method(self, x):
+                nonlocal call_count
+                call_count += 1
+                return x * 2
+
+        obj = MyClass()
+        result1 = obj.expensive_method(5)
+        result2 = obj.expensive_method(5)
+
+        assert result1 == 10
+        assert result2 == 10
+        assert call_count == 1
+
+    def test_different_instances_cached(self):
+        """Test different instances have separate caches."""
+        call_count = 0
+
+        class MyClass:
+            def __init__(self, pk):
+                self.pk = pk
+
+            @cache_method(timeout=60, key_attr='pk')
+            def method(self):
+                nonlocal call_count
+                call_count += 1
+                return self.pk * 2
+
+        obj1 = MyClass(1)
+        obj2 = MyClass(2)
+
+        result1 = obj1.method()
+        result2 = obj2.method()
+
+        assert result1 == 2
+        assert result2 == 4
+        assert call_count == 2
