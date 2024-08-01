@@ -80,3 +80,158 @@ def send_template_email(subject, template_name, context, to, from_email=None,
 
     Args:
         subject: Email subject.
+        template_name: Path to HTML template.
+        context: Context dictionary for the template.
+        to: List of recipient email addresses.
+        from_email: Sender email.
+        text_template_name: Optional path to plain text template.
+        **kwargs: Additional arguments passed to send_html_email.
+
+    Returns:
+        Number of emails sent.
+    """
+    html_content = render_to_string(template_name, context)
+
+    if text_template_name:
+        text_content = render_to_string(text_template_name, context)
+    else:
+        text_content = None
+
+    return send_html_email(
+        subject=subject,
+        html_content=html_content,
+        to=to,
+        from_email=from_email,
+        text_content=text_content,
+        **kwargs
+    )
+
+
+class EmailBuilder:
+    """Fluent builder for constructing and sending emails."""
+
+    def __init__(self):
+        self._subject = ''
+        self._to = []
+        self._cc = []
+        self._bcc = []
+        self._from_email = None
+        self._reply_to = []
+        self._html_content = None
+        self._text_content = None
+        self._attachments = []
+        self._headers = {}
+
+    def subject(self, subject):
+        """Set email subject."""
+        self._subject = subject
+        return self
+
+    def to(self, *recipients):
+        """Add recipients."""
+        for recipient in recipients:
+            if isinstance(recipient, (list, tuple)):
+                self._to.extend(recipient)
+            else:
+                self._to.append(recipient)
+        return self
+
+    def cc(self, *recipients):
+        """Add CC recipients."""
+        for recipient in recipients:
+            if isinstance(recipient, (list, tuple)):
+                self._cc.extend(recipient)
+            else:
+                self._cc.append(recipient)
+        return self
+
+    def bcc(self, *recipients):
+        """Add BCC recipients."""
+        for recipient in recipients:
+            if isinstance(recipient, (list, tuple)):
+                self._bcc.extend(recipient)
+            else:
+                self._bcc.append(recipient)
+        return self
+
+    def from_email(self, email):
+        """Set sender email."""
+        self._from_email = email
+        return self
+
+    def reply_to(self, *emails):
+        """Set reply-to addresses."""
+        self._reply_to.extend(emails)
+        return self
+
+    def html(self, content):
+        """Set HTML content."""
+        self._html_content = content
+        return self
+
+    def text(self, content):
+        """Set plain text content."""
+        self._text_content = content
+        return self
+
+    def template(self, template_name, context=None):
+        """Set content from template."""
+        context = context or {}
+        self._html_content = render_to_string(template_name, context)
+        return self
+
+    def attach(self, filename, content, mimetype=None):
+        """Add an attachment."""
+        if mimetype:
+            self._attachments.append((filename, content, mimetype))
+        else:
+            self._attachments.append((filename, content))
+        return self
+
+    def attach_file(self, filepath, filename=None, mimetype=None):
+        """Attach a file from disk."""
+        import os
+        filename = filename or os.path.basename(filepath)
+        with open(filepath, 'rb') as f:
+            content = f.read()
+        return self.attach(filename, content, mimetype)
+
+    def header(self, name, value):
+        """Add a custom header."""
+        self._headers[name] = value
+        return self
+
+    def send(self, fail_silently=False):
+        """Send the email."""
+        if not self._html_content:
+            raise ValueError('Email content is required. Use html() or template().')
+
+        if not self._to:
+            raise ValueError('At least one recipient is required.')
+
+        return send_html_email(
+            subject=self._subject,
+            html_content=self._html_content,
+            to=self._to,
+            from_email=self._from_email,
+            text_content=self._text_content,
+            cc=self._cc or None,
+            bcc=self._bcc or None,
+            reply_to=self._reply_to or None,
+            attachments=self._attachments or None,
+            fail_silently=fail_silently,
+        )
+
+    def preview(self):
+        """Return a dict representation of the email for preview."""
+        return {
+            'subject': self._subject,
+            'to': self._to,
+            'cc': self._cc,
+            'bcc': self._bcc,
+            'from_email': self._from_email,
+            'reply_to': self._reply_to,
+            'html_content': self._html_content,
+            'text_content': self._text_content or strip_tags(self._html_content or ''),
+            'attachments': [(a[0], len(a[1])) for a in self._attachments],
+        }
