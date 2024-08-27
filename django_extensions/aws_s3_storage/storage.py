@@ -128,3 +128,246 @@ class S3Storage(Storage):
             Key=name,
             Body=data,
             **extra_args
+        )
+
+        return name
+
+    def _open(self, name, mode='rb'):
+        """Open file from S3."""
+        name = self._normalize_name(name)
+
+        response = self.client.get_object(
+            Bucket=self.bucket_name,
+            Key=name
+        )
+
+        return ContentFile(response['Body'].read(), name=name)
+
+    def delete(self, name):
+        """Delete file from S3."""
+        name = self._normalize_name(name)
+        self.client.delete_object(
+            Bucket=self.bucket_name,
+            Key=name
+        )
+
+    def exists(self, name):
+        """Check if file exists in S3."""
+        name = self._normalize_name(name)
+        try:
+            self.client.head_object(
+                Bucket=self.bucket_name,
+                Key=name
+            )
+            return True
+        except Exception:
+            return False
+
+    def listdir(self, path=''):
+        """List contents of a path in S3."""
+        path = self._normalize_name(path)
+        if path and not path.endswith('/'):
+            path += '/'
+
+        directories = set()
+        files = []
+
+        paginator = self.client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=self.bucket_name, Prefix=path, Delimiter='/'):
+            # Get directories
+            for prefix in page.get('CommonPrefixes', []):
+                directories.add(prefix['Prefix'][len(path):].rstrip('/'))
+
+            # Get files
+            for obj in page.get('Contents', []):
+                key = obj['Key'][len(path):]
+                if key:
+                    files.append(key)
+
+        return list(directories), files
+
+    def size(self, name):
+        """Get file size."""
+        name = self._normalize_name(name)
+        response = self.client.head_object(
+            Bucket=self.bucket_name,
+            Key=name
+        )
+        return response['ContentLength']
+
+    def url(self, name):
+        """Get URL for file."""
+        name = self._normalize_name(name)
+
+        if self.custom_domain:
+            return f"https://{self.custom_domain}/{name}"
+
+        return f"https://{self.bucket_name}.s3.{self.region}.amazonaws.com/{name}"
+
+    def get_presigned_url(self, name, expires=3600, method='get_object'):
+        """Get a presigned URL for the file."""
+        name = self._normalize_name(name)
+
+        params = {
+            'Bucket': self.bucket_name,
+            'Key': name,
+        }
+
+        return self.client.generate_presigned_url(
+            method,
+            Params=params,
+            ExpiresIn=expires
+        )
+
+    def get_accessed_time(self, name):
+        """Not supported by S3."""
+        raise NotImplementedError("S3 doesn't track access time")
+
+    def get_created_time(self, name):
+        """Not supported by S3."""
+        raise NotImplementedError("S3 doesn't track creation time")
+
+    def get_modified_time(self, name):
+        """Get last modified time."""
+        name = self._normalize_name(name)
+        response = self.client.head_object(
+            Bucket=self.bucket_name,
+            Key=name
+        )
+        return response['LastModified']
+
+
+def s3_upload(file_obj, key, bucket=None, content_type=None, acl=None, metadata=None):
+    """
+    Upload a file to S3.
+
+    Args:
+        file_obj: File object or bytes to upload
+        key: S3 key (path)
+        bucket: Bucket name (defaults to AWS_S3_BUCKET_NAME)
+        content_type: Content type (auto-detected if not provided)
+        acl: Access control (default: private)
+        metadata: Optional metadata dict
+
+    Returns:
+        str: URL of uploaded file
+    """
+    client = get_boto3_client('s3')
+    bucket = bucket or getattr(settings, 'AWS_S3_BUCKET_NAME')
+    region = getattr(settings, 'AWS_S3_REGION', 'us-east-1')
+
+    extra_args = {}
+
+    if content_type:
+        extra_args['ContentType'] = content_type
+    else:
+        ct, _ = mimetypes.guess_type(key)
+        if ct:
+            extra_args['ContentType'] = ct
+
+    if acl:
+        extra_args['ACL'] = acl
+
+    if metadata:
+        extra_args['Metadata'] = metadata
+
+    # Handle different input types
+    if hasattr(file_obj, 'read'):
+        file_obj.seek(0)
+        data = file_obj.read()
+    elif isinstance(file_obj, bytes):
+        data = file_obj
+    else:
+        data = str(file_obj).encode()
+
+    client.put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=data,
+        **extra_args
+    )
+
+    return f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
+
+
+def s3_download(key, bucket=None):
+    """
+    Download a file from S3.
+
+    Args:
+        key: S3 key (path)
+        bucket: Bucket name
+
+    Returns:
+        bytes: File contents
+    """
+    client = get_boto3_client('s3')
+    bucket = bucket or getattr(settings, 'AWS_S3_BUCKET_NAME')
+
+    response = client.get_object(
+        Bucket=bucket,
+        Key=key
+    )
+
+    return response['Body'].read()
+
+
+def get_presigned_url(key, bucket=None, expires=3600, method='get_object'):
+    """
+    Get a presigned URL for an S3 object.
+
+    Args:
+        key: S3 key (path)
+        bucket: Bucket name
+        expires: Expiration time in seconds (default: 1 hour)
+        method: S3 method ('get_object' or 'put_object')
+
+    Returns:
+        str: Presigned URL
+    """
+    client = get_boto3_client('s3')
+    bucket = bucket or getattr(settings, 'AWS_S3_BUCKET_NAME')
+
+    return client.generate_presigned_url(
+        method,
+        Params={'Bucket': bucket, 'Key': key},
+        ExpiresIn=expires
+    )
+
+
+def s3_delete(key, bucket=None):
+    """
+    Delete a file from S3.
+
+    Args:
+        key: S3 key (path)
+        bucket: Bucket name
+    """
+    client = get_boto3_client('s3')
+    bucket = bucket or getattr(settings, 'AWS_S3_BUCKET_NAME')
+
+    client.delete_object(
+        Bucket=bucket,
+        Key=key
+    )
+
+
+def s3_copy(source_key, dest_key, source_bucket=None, dest_bucket=None):
+    """
+    Copy a file within S3.
+
+    Args:
+        source_key: Source S3 key
+        dest_key: Destination S3 key
+        source_bucket: Source bucket (defaults to AWS_S3_BUCKET_NAME)
+        dest_bucket: Destination bucket (defaults to source bucket)
+    """
+    client = get_boto3_client('s3')
+    source_bucket = source_bucket or getattr(settings, 'AWS_S3_BUCKET_NAME')
+    dest_bucket = dest_bucket or source_bucket
+
+    client.copy_object(
+        CopySource={'Bucket': source_bucket, 'Key': source_key},
+        Bucket=dest_bucket,
+        Key=dest_key
+    )
