@@ -92,3 +92,144 @@ class TestS3Storage:
 
         assert result.read() == b'file contents'
         mock_client.get_object.assert_called_once()
+
+    def test_delete(self, storage, mock_client):
+        """Test deleting a file."""
+        storage.delete('path/to/test.txt')
+
+        mock_client.delete_object.assert_called_once_with(
+            Bucket='test-bucket',
+            Key='path/to/test.txt'
+        )
+
+    def test_exists_true(self, storage, mock_client):
+        """Test exists returns True when file exists."""
+        mock_client.head_object.return_value = {}
+
+        assert storage.exists('path/to/test.txt') is True
+
+    def test_exists_false(self, storage, mock_client):
+        """Test exists returns False when file doesn't exist."""
+        mock_client.head_object.side_effect = Exception('Not found')
+
+        assert storage.exists('path/to/test.txt') is False
+
+    def test_size(self, storage, mock_client):
+        """Test getting file size."""
+        mock_client.head_object.return_value = {'ContentLength': 1024}
+
+        assert storage.size('path/to/test.txt') == 1024
+
+    def test_url(self, storage):
+        """Test generating URL."""
+        url = storage.url('path/to/file.txt')
+        assert 'test-bucket' in url
+        assert 'path/to/file.txt' in url
+
+    def test_url_with_custom_domain(self, mock_settings, mock_client):
+        """Test URL with custom domain."""
+        with patch('django_extensions.aws_s3_storage.storage.get_boto3_client', return_value=mock_client):
+            storage = S3Storage(custom_domain='cdn.example.com')
+            storage._client = mock_client
+
+            url = storage.url('path/to/file.txt')
+            assert url == 'https://cdn.example.com/path/to/file.txt'
+
+    def test_get_presigned_url(self, storage, mock_client):
+        """Test generating presigned URL."""
+        mock_client.generate_presigned_url.return_value = 'https://signed-url'
+
+        url = storage.get_presigned_url('path/to/file.txt', expires=7200)
+
+        assert url == 'https://signed-url'
+        mock_client.generate_presigned_url.assert_called_once()
+
+
+class TestS3Functions:
+    """Test S3 helper functions."""
+
+    @pytest.fixture
+    def mock_settings(self, settings):
+        """Configure test settings."""
+        settings.AWS_S3_BUCKET_NAME = 'test-bucket'
+        settings.AWS_S3_REGION = 'us-east-1'
+        settings.AWS_ACCESS_KEY_ID = 'test-key'
+        settings.AWS_SECRET_ACCESS_KEY = 'test-secret'
+        return settings
+
+    def test_s3_upload_bytes(self, mock_settings):
+        """Test uploading bytes."""
+        with patch('django_extensions.aws_s3_storage.storage.get_boto3_client') as mock_get:
+            mock_client = MagicMock()
+            mock_get.return_value = mock_client
+
+            url = s3_upload(b'test data', 'path/to/file.txt')
+
+            assert 'test-bucket' in url
+            mock_client.put_object.assert_called_once()
+
+    def test_s3_upload_file_object(self, mock_settings):
+        """Test uploading file object."""
+        with patch('django_extensions.aws_s3_storage.storage.get_boto3_client') as mock_get:
+            mock_client = MagicMock()
+            mock_get.return_value = mock_client
+
+            file_obj = BytesIO(b'test data')
+            url = s3_upload(file_obj, 'path/to/file.txt')
+
+            assert 'test-bucket' in url
+
+    def test_s3_upload_with_metadata(self, mock_settings):
+        """Test uploading with metadata."""
+        with patch('django_extensions.aws_s3_storage.storage.get_boto3_client') as mock_get:
+            mock_client = MagicMock()
+            mock_get.return_value = mock_client
+
+            s3_upload(
+                b'test data',
+                'path/to/file.txt',
+                metadata={'author': 'test'}
+            )
+
+            call_kwargs = mock_client.put_object.call_args[1]
+            assert call_kwargs['Metadata'] == {'author': 'test'}
+
+    def test_s3_download(self, mock_settings):
+        """Test downloading a file."""
+        with patch('django_extensions.aws_s3_storage.storage.get_boto3_client') as mock_get:
+            mock_client = MagicMock()
+            mock_client.get_object.return_value = {
+                'Body': MagicMock(read=lambda: b'file contents')
+            }
+            mock_get.return_value = mock_client
+
+            data = s3_download('path/to/file.txt')
+
+            assert data == b'file contents'
+
+    def test_get_presigned_url(self, mock_settings):
+        """Test getting presigned URL."""
+        with patch('django_extensions.aws_s3_storage.storage.get_boto3_client') as mock_get:
+            mock_client = MagicMock()
+            mock_client.generate_presigned_url.return_value = 'https://signed-url'
+            mock_get.return_value = mock_client
+
+            url = get_presigned_url('path/to/file.txt', expires=3600)
+
+            assert url == 'https://signed-url'
+            mock_client.generate_presigned_url.assert_called_once()
+
+    def test_get_presigned_url_for_upload(self, mock_settings):
+        """Test getting presigned URL for upload."""
+        with patch('django_extensions.aws_s3_storage.storage.get_boto3_client') as mock_get:
+            mock_client = MagicMock()
+            mock_client.generate_presigned_url.return_value = 'https://upload-url'
+            mock_get.return_value = mock_client
+
+            url = get_presigned_url('path/to/file.txt', method='put_object')
+
+            mock_client.generate_presigned_url.assert_called_with(
+                'put_object',
+                Params={'Bucket': 'test-bucket', 'Key': 'path/to/file.txt'},
+                ExpiresIn=3600
+            )
