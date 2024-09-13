@@ -110,3 +110,211 @@ class SESEmailBackend(BaseEmailBackend):
             }
             if html_content:
                 email_body['Html'] = {'Data': html_content, 'Charset': 'UTF-8'}
+        else:
+            email_body = {
+                'Text': {'Data': message.body, 'Charset': 'UTF-8'},
+            }
+
+        send_args = {
+            'Source': message.from_email,
+            'Destination': destination,
+            'Message': {
+                'Subject': {'Data': message.subject, 'Charset': 'UTF-8'},
+                'Body': email_body,
+            },
+        }
+
+        # Add optional parameters
+        if message.reply_to:
+            send_args['ReplyToAddresses'] = message.reply_to
+
+        if self.return_path:
+            send_args['ReturnPath'] = self.return_path
+
+        if self.configuration_set:
+            send_args['ConfigurationSetName'] = self.configuration_set
+
+        # Add custom headers as tags
+        if message.extra_headers:
+            tags = []
+            for key, value in message.extra_headers.items():
+                if key.startswith('X-SES-'):
+                    continue  # Skip SES-specific headers
+                tags.append({'Name': key[:256], 'Value': str(value)[:256]})
+            if tags:
+                send_args['Tags'] = tags[:50]  # Max 50 tags
+
+        self.client.send_email(**send_args)
+        return True
+
+
+def send_ses_email(
+    subject,
+    body,
+    to,
+    from_email=None,
+    html_body=None,
+    cc=None,
+    bcc=None,
+    reply_to=None,
+    attachments=None,
+    configuration_set=None,
+    tags=None
+):
+    """
+    Send an email via AWS SES.
+
+    Args:
+        subject: Email subject
+        body: Plain text body
+        to: List of recipient emails
+        from_email: Sender email (defaults to DEFAULT_FROM_EMAIL)
+        html_body: Optional HTML body
+        cc: List of CC recipients
+        bcc: List of BCC recipients
+        reply_to: List of reply-to addresses
+        attachments: List of attachments (not supported for simple send)
+        configuration_set: SES configuration set name
+        tags: Dict of tags for tracking
+
+    Returns:
+        dict: SES response with MessageId
+    """
+    client = get_ses_client()
+
+    from_email = from_email or getattr(settings, 'DEFAULT_FROM_EMAIL')
+
+    if isinstance(to, str):
+        to = [to]
+
+    destination = {'ToAddresses': to}
+    if cc:
+        destination['CcAddresses'] = cc if isinstance(cc, list) else [cc]
+    if bcc:
+        destination['BccAddresses'] = bcc if isinstance(bcc, list) else [bcc]
+
+    email_body = {'Text': {'Data': body, 'Charset': 'UTF-8'}}
+    if html_body:
+        email_body['Html'] = {'Data': html_body, 'Charset': 'UTF-8'}
+
+    send_args = {
+        'Source': from_email,
+        'Destination': destination,
+        'Message': {
+            'Subject': {'Data': subject, 'Charset': 'UTF-8'},
+            'Body': email_body,
+        },
+    }
+
+    if reply_to:
+        send_args['ReplyToAddresses'] = reply_to if isinstance(reply_to, list) else [reply_to]
+
+    if configuration_set:
+        send_args['ConfigurationSetName'] = configuration_set
+
+    if tags:
+        send_args['Tags'] = [
+            {'Name': k[:256], 'Value': str(v)[:256]}
+            for k, v in tags.items()
+        ][:50]
+
+    return client.send_email(**send_args)
+
+
+def send_templated_email(
+    template_name,
+    template_data,
+    to,
+    from_email=None,
+    cc=None,
+    bcc=None,
+    reply_to=None,
+    configuration_set=None,
+    tags=None
+):
+    """
+    Send a templated email via AWS SES.
+
+    Args:
+        template_name: Name of SES template
+        template_data: Dict of template variables
+        to: List of recipient emails
+        from_email: Sender email
+        cc: List of CC recipients
+        bcc: List of BCC recipients
+        reply_to: Reply-to addresses
+        configuration_set: SES configuration set
+        tags: Dict of tags
+
+    Returns:
+        dict: SES response
+    """
+    client = get_ses_client()
+
+    from_email = from_email or getattr(settings, 'DEFAULT_FROM_EMAIL')
+
+    if isinstance(to, str):
+        to = [to]
+
+    destination = {'ToAddresses': to}
+    if cc:
+        destination['CcAddresses'] = cc if isinstance(cc, list) else [cc]
+    if bcc:
+        destination['BccAddresses'] = bcc if isinstance(bcc, list) else [bcc]
+
+    send_args = {
+        'Source': from_email,
+        'Destination': destination,
+        'Template': template_name,
+        'TemplateData': json.dumps(template_data),
+    }
+
+    if reply_to:
+        send_args['ReplyToAddresses'] = reply_to if isinstance(reply_to, list) else [reply_to]
+
+    if configuration_set:
+        send_args['ConfigurationSetName'] = configuration_set
+
+    if tags:
+        send_args['Tags'] = [
+            {'Name': k[:256], 'Value': str(v)[:256]}
+            for k, v in tags.items()
+        ][:50]
+
+    return client.send_templated_email(**send_args)
+
+
+def verify_email_identity(email):
+    """
+    Send verification email for a new sender identity.
+
+    Args:
+        email: Email address to verify
+
+    Returns:
+        dict: SES response
+    """
+    client = get_ses_client()
+    return client.verify_email_identity(EmailAddress=email)
+
+
+def get_send_quota():
+    """
+    Get SES sending quota information.
+
+    Returns:
+        dict: Quota info with Max24HourSend, MaxSendRate, SentLast24Hours
+    """
+    client = get_ses_client()
+    return client.get_send_quota()
+
+
+def get_send_statistics():
+    """
+    Get SES sending statistics.
+
+    Returns:
+        dict: Statistics for the last 2 weeks
+    """
+    client = get_ses_client()
+    return client.get_send_statistics()
