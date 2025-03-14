@@ -4,11 +4,163 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "django-extensions-collection"
-version = "0.1.0"
-description = "A collection of Django extensions"
-requires-python = ">=3.8"
+version = "1.0.0"
+description = "A comprehensive collection of 51 Django extensions for building production-ready applications"
+readme = "README.md"
 license = {text = "MIT"}
-dependencies = ["Django>=3.2"]
+requires-python = ">=3.8"
+authors = [
+    {name = "Django Extensions Collection", email = "extensions@example.com"}
+]
+keywords = [
+    "django",
+    "extensions",
+    "utilities",
+    "models",
+    "validators",
+    "template-tags",
+    "aws",
+    "s3",
+    "stripe",
+    "redis",
+    "openai",
+    "anthropic",
+    "slack",
+    "discord",
+    "twilio",
+    "sentry"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 3.2",
+    "Framework :: Django :: 4.0",
+    "Framework :: Django :: 4.1",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "Django>=3.2",
+]
+
+[project.optional-dependencies]
+# AWS integrations
+aws = [
+    "boto3>=1.26.0",
+]
+
+# Payment processing
+payments = [
+    "stripe>=5.0.0",
+]
+
+# SMS/messaging
+messaging = [
+    "twilio>=8.0.0",
+]
+
+# AI integrations
+ai = [
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+]
+
+# Caching
+cache = [
+    "redis>=4.0.0",
+]
+
+# Error tracking
+monitoring = [
+    "sentry-sdk>=1.0.0",
+]
+
+# Encryption
+crypto = [
+    "cryptography>=3.0.0",
+]
+
+# JSON Schema validation
+schema = [
+    "jsonschema>=4.0.0",
+]
+
+# All optional dependencies
+all = [
+    "boto3>=1.26.0",
+    "stripe>=5.0.0",
+    "twilio>=8.0.0",
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+    "redis>=4.0.0",
+    "sentry-sdk>=1.0.0",
+    "cryptography>=3.0.0",
+    "jsonschema>=4.0.0",
+]
+
+# Development dependencies
+dev = [
+    "pytest>=7.0.0",
+    "pytest-django>=4.5.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/example/django-extensions-collection"
+Documentation = "https://github.com/example/django-extensions-collection#readme"
+Repository = "https://github.com/example/django-extensions-collection"
+Changelog = "https://github.com/example/django-extensions-collection/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["django_extensions*"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "test_settings"
+python_files = ["tests.py", "test_*.py"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | migrations
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = [".venv", "migrations"]
