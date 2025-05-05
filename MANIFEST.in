@@ -1,0 +1,14 @@
+include LICENSE
+include README.md
+include CHANGELOG.md
+include pyproject.toml
+recursive-include django_extensions *.py
+recursive-include django_extensions *.html
+recursive-include django_extensions *.txt
+recursive-include django_extensions README.md
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude *.pyo
+global-exclude .DS_Store
+prune tests
+prune docs
